@@ -1,6 +1,6 @@
 import * as React from 'react';
+import { useState } from 'react';
 import { styled } from '@mui/material/styles';
-import { useState } from "react";
 import { open } from '@tauri-apps/plugin-dialog';
 import {
   Alert,
@@ -11,7 +11,8 @@ import {
   LinearProgress,
   Snackbar,
   Stack,
-  TextField, Tooltip,
+  TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 import { invoke } from "@tauri-apps/api/core";
@@ -23,10 +24,6 @@ import ClearIcon from '@mui/icons-material/Clear';
 import ReplayIcon from '@mui/icons-material/Replay';
 import HelpIcon from '@mui/icons-material/Help'; // 引入帮助图标
 
-
-function InfoIcon() {
-  return null;
-}
 
 export default function GitUtil() {
 
@@ -68,29 +65,6 @@ export default function GitUtil() {
     setFolderPaths(folderPaths.filter(p => p !== path));
   }
 
-  async function rebaseToMaster() {
-    const total = folderPaths.length;
-    if (total === 0) {
-      setAlertMessage('没有指定任何文件夹路径，请添加至少一个文件夹路径。');
-      setAlterOpen(true);
-      return;
-    }
-    let temp = 0.0;
-    updateProgress(temp, total);
-    for (const folderPath of folderPaths) {
-      try {
-        let folderPathTemp = folderPath;
-        folderPathTemp = folderPathTemp.replaceAll('\\', "\\\\");
-        await invoke('execute_rebase_to_master_script', {filePath: folderPathTemp});
-        updateProgress(++temp, total);
-      } catch (error) {
-        console.error('Error executing command:', error);
-        alert(error)
-      }
-    }
-    setOutput(output + '\r\n[重置到Master]: ' + folderPaths.map(p => p.substring(p.lastIndexOf('\\') + 1)).join(','));
-  }
-
   function extractBranchNumber(commitMessage) {
     // 匹配完整的 URL 格式
     const regex = /https:\/\/devops\.aliyun\.com\/projex\/req\/([A-Z0-9-]+)#/;
@@ -101,8 +75,7 @@ export default function GitUtil() {
       return null;  // 如果没有匹配，返回 null
     }
   }
-
-  async function handleCommitAndPush() {
+  async function executeTaskWithFolderPaths(taskName, taskFunction) {
     const total = folderPaths.length;
     if (total === 0) {
       setAlertMessage('没有指定任何文件夹路径，请添加至少一个文件夹路径。');
@@ -126,88 +99,48 @@ export default function GitUtil() {
     updateProgress(temp, total);
     for (const folderPath of folderPaths) {
       try {
-        let folderPathTemp = folderPath;
-        folderPathTemp = folderPathTemp.replaceAll('\\', "\\\\");
-        await invoke('execute_rebase_to_master_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
+        let folderPathTemp = folderPath.replaceAll('\\', "\\\\");
+        await taskFunction(folderPathTemp, branchNumber);
         updateProgress(++temp, total);
       } catch (error) {
-        console.error('Error executing command:', error);
-        alert(error)
+        console.error(`Error executing ${taskName}:`, error);
+        alert(error);
+        break; // Stop processing further if one fails
       }
     }
-    setOutput(output + '\r\n[提交推送]: ' + folderPaths.join(','));
+    setOutput(output + `\r\n[${taskName}]: ` + folderPaths.map(p => p.substring(p.lastIndexOf('\\') + 1)).join(','));
   }
 
-  async function handleCommit() {
-    const total = folderPaths.length;
-    if (total === 0) {
-      setAlertMessage('没有指定任何文件夹路径，请添加至少一个文件夹路径。');
-      setAlterOpen(true);
-      return;
-    }
-    if (!commitMessage || commitMessage.length === 0) {
-      setAlertMessage('提交信息不能为空。');
-      setAlterOpen(true);
-      return;
-    }
-
-    const branchNumber = extractBranchNumber(commitMessage);
-    if (!branchNumber) {
-      setAlertMessage('无法找到有效的分支号。');
-      setAlterOpen(true);
-      return;
-    }
-
-    let temp = 0.0;
-    updateProgress(temp, total);
-    for (const folderPath of folderPaths) {
-      try {
-        let folderPathTemp = folderPath;
-        folderPathTemp = folderPathTemp.replaceAll('\\', "\\\\");
-        await invoke('execute_commit_and_push_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
-        updateProgress(++temp, total);
-      } catch (error) {
-        console.error('Error executing command:', error);
-        alert(error)
-      }
-    }
-    setOutput(output + '\r\n[仅提交]: ' + folderPaths.join(','));
+  async function rebaseToMaster(folderPathTemp) {
+    await invoke('execute_rebase_to_master_script', {filePath: folderPathTemp});
   }
 
-  async function handleDeleteRemote() {
-    const total = folderPaths.length;
-    if (total === 0) {
-      setAlertMessage('没有指定任何文件夹路径，请添加至少一个文件夹路径。');
-      setAlterOpen(true);
-      return;
-    }
-    if (!commitMessage || commitMessage.length === 0) {
-      setAlertMessage('提交信息不能为空。');
-      setAlterOpen(true);
-      return;
-    }
+  async function commitAndPush(folderPathTemp, branchNumber) {
+    await invoke('execute_commit_and_push_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
+  }
 
-    const branchNumber = extractBranchNumber(commitMessage);
-    if (!branchNumber) {
-      setAlertMessage('无法找到有效的分支号。');
-      setAlterOpen(true);
-      return;
-    }
+  async function commitBranch(folderPathTemp, branchNumber) {
+    await invoke('execute_commit_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
+  }
 
-    let temp = 0.0;
-    updateProgress(temp, total);
-    for (const folderPath of folderPaths) {
-      try {
-        let folderPathTemp = folderPath;
-        folderPathTemp = folderPathTemp.replaceAll('\\', "\\\\");
-        await invoke('execute_commit_and_push_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
-        updateProgress(++temp, total);
-      } catch (error) {
-        console.error('Error executing command:', error);
-        alert(error)
-      }
-    }
-    setOutput(output + '\r\n[删除远程分支]: ' + folderPaths.join(','));
+  async function deleteRemoteBranch(folderPathTemp, branchNumber) {
+    await invoke('execute_delete_remote_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
+  }
+
+  async function handleRebaseToMaster() {
+    await executeTaskWithFolderPaths('重置到master', rebaseToMaster);
+  }
+
+  async function handleCommitAndPushBranch() {
+    await executeTaskWithFolderPaths('提交推送', commitAndPush);
+  }
+
+  async function handleCommitBranch() {
+    await executeTaskWithFolderPaths('仅提交', commitBranch);
+  }
+
+  async function handleDeleteRemoteBranch() {
+    await executeTaskWithFolderPaths('删除远程分支', deleteRemoteBranch);
   }
 
   return (
@@ -285,7 +218,7 @@ export default function GitUtil() {
           <Button
             variant="contained"
             color="success"
-            onClick={handleCommitAndPush}
+            onClick={handleCommitAndPushBranch}
             startIcon={<UploadIcon/>}
             sx={{fontSize: '0.875rem', padding: '6px 12px', width: 'auto'}}
           >
@@ -295,7 +228,7 @@ export default function GitUtil() {
           <Button
             variant="contained"
             color="success"
-            onClick={handleCommit}
+            onClick={handleCommitBranch}
             startIcon={<UploadIcon/>}
             sx={{fontSize: '0.875rem', padding: '6px 12px', width: 'auto'}}
           >
@@ -306,7 +239,7 @@ export default function GitUtil() {
           <Button
             variant="contained"
             color="error"
-            onClick={handleDeleteRemote}
+            onClick={handleDeleteRemoteBranch}
             startIcon={<DeleteIcon/>}
             sx={{fontSize: '0.875rem', padding: '6px 12px', width: 'auto'}}
           >
@@ -316,11 +249,11 @@ export default function GitUtil() {
           <Button
             variant="contained"
             color="error"
-            onClick={rebaseToMaster}
+            onClick={handleRebaseToMaster}
             startIcon={<ReplayIcon/>}
-            sx={{fontSize: '0.875rem', padding: '6px 12px', width: 'auto'}}
+            style={{ textTransform: 'none', fontSize: '0.875rem', padding: '6px 12px', width: 'auto' }}
           >
-            重置到Master
+            重置到master
           </Button>
 
           <Button variant="outlined" color="error" onClick={() => setOutput('')} startIcon={<ClearIcon/>}>
