@@ -88,7 +88,7 @@ export default function GitUtil() {
         alert(error)
       }
     }
-    setOutput(output + '\r\n[重置到Master]: ' + folderPaths.join(','));
+    setOutput(output + '\r\n[重置到Master]: ' + folderPaths.map(p => p.substring(p.lastIndexOf('\\') + 1)).join(','));
   }
 
   function extractBranchNumber(commitMessage) {
@@ -128,7 +128,7 @@ export default function GitUtil() {
       try {
         let folderPathTemp = folderPath;
         folderPathTemp = folderPathTemp.replaceAll('\\', "\\\\");
-        await invoke('execute_commit_and_push_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
+        await invoke('execute_rebase_to_master_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
         updateProgress(++temp, total);
       } catch (error) {
         console.error('Error executing command:', error);
@@ -238,10 +238,10 @@ export default function GitUtil() {
               </FileChipContainer>
               <ButtonColumn>
                 <Button variant="contained" color="primary" onClick={handleFolderSelect} startIcon={<FolderOpenIcon/>}>
-                  选择文件夹
+                  文件夹
                 </Button>
                 <Button variant="contained" color="error" onClick={() => setFolderPaths([])} startIcon={<ClearIcon/>}>
-                  清空选择
+                  清空
                 </Button>
               </ButtonColumn>
             </FileUploadContainer>
