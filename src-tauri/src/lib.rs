@@ -5,7 +5,7 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-fn execute_shell_script(file_path: String) -> Result<String, String> {
+fn execute_rebase_to_master_script(file_path: String) -> Result<String, String> {
     let bash_path = "C:\\Program Files\\Git\\bin\\bash.exe";
     let current_dir = std::env::current_dir().unwrap();
     // 将 PathBuf 转换为字符串进行处理
@@ -34,7 +34,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![greet])
-        .invoke_handler(tauri::generate_handler![execute_shell_script])
+        .invoke_handler(tauri::generate_handler![execute_rebase_to_master_script])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
