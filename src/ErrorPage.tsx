@@ -1,6 +1,7 @@
 import { Button, Link } from "@mui/material";
 import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
+import React from 'react';
 
 export default function ErrorPage() {
 

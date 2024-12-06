@@ -8,7 +8,7 @@ import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } 
 
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route path="/" element={<App/>} errorElement={<ErrorPage/>} futureFlags={{v7_relativeSplatPath: true}}>
+    <Route path="/" element={<App/>} errorElement={<ErrorPage/>}>
       <Route path="views/GitUtil" element={<GitUtil/>}/>
     </Route>
   )

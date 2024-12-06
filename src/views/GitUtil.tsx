@@ -26,72 +26,67 @@ import HelpIcon from '@mui/icons-material/Help'; // 引入帮助图标
 
 
 export default function GitUtil() {
+  const [alertOpen, setAlertOpen] = useState<boolean>(false);
+  const [alertMessage, setAlertMessage] = useState<string>('');
+  const [folderPaths, setFolderPaths] = useState<string[]>([]);
+  const [progress, setProgress] = useState<number>(0);
+  const [output, setOutput] = useState<string>('');
+  const [commitMessage, setCommitMessage] = useState<string>('');
 
-  const [alertOpen, setAlterOpen] = useState(false);
-  const [alertMessage, setAlertMessage] = useState('');
 
-  const [folderPaths, setFolderPaths] = useState([]);
-  const [progress, setProgress] = useState(0);
-  const [output, setOutput] = useState('');
-  const [commitMessage, setCommitMessage] = useState(''); // 新增状态管理提交信息
-
-  const handleClose = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-    setAlterOpen(false);
-  };
-
-  function updateProgress(current, total) {
+  function updateProgress(current: number, total: number) {
     const newProgress = (current / total) * 100;
     setProgress(newProgress);
   }
 
-  async function handleFolderSelect(event) {
+  async function handleFolderSelect() {
     try {
-      const paths = await open({
+
+      const options = {
         directory: true,
         multiple: true
-      });
-      // 使用 Set 来去除重复的路径
+      };
+
+      const paths: string[] | null = (await open(options)) as string[] | null;
+
+      if (!paths) {
+        console.error('empty paths');
+        return;
+      }
       const uniquePaths = new Set([...folderPaths, ...paths]);
       setFolderPaths([...uniquePaths]);
     } catch (error) {
-      console.log(error)
+      console.error(error);
     }
   }
 
-  function removeFolderPath(path) {
+  function removeFolderPath(path: string) {
     setFolderPaths(folderPaths.filter(p => p !== path));
   }
 
-  function extractBranchNumber(commitMessage) {
-    // 匹配完整的 URL 格式
+  function extractBranchNumber(commitMessage: string): string | null {
     const regex = /https:\/\/devops\.aliyun\.com\/projex\/req\/([A-Z0-9-]+)#/;
     const match = commitMessage.match(regex);
-    if (match && match[1]) {
-      return match[1];  // 返回匹配的分支号
-    } else {
-      return null;  // 如果没有匹配，返回 null
-    }
+    return match && match[1] ? match[1] : null;
   }
-  async function executeTaskWithFolderPaths(taskName, taskFunction) {
+
+  async function executeTaskWithFolderPaths(taskName: string, taskFunction: (folderPathTemp: string, branchNumber: string) => Promise<void>) {
     const total = folderPaths.length;
     if (total === 0) {
       setAlertMessage('没有指定任何文件夹路径，请添加至少一个文件夹路径。');
-      setAlterOpen(true);
+      setAlertOpen(true);
       return;
     }
     if (!commitMessage || commitMessage.length === 0) {
       setAlertMessage('提交信息不能为空。');
-      setAlterOpen(true);
+      setAlertOpen(true);
       return;
     }
 
     const branchNumber = extractBranchNumber(commitMessage);
     if (!branchNumber) {
       setAlertMessage('无法找到有效的分支号。');
-      setAlterOpen(true);
+      setAlertOpen(true);
       return;
     }
 
@@ -99,7 +94,7 @@ export default function GitUtil() {
     updateProgress(temp, total);
     for (const folderPath of folderPaths) {
       try {
-        let folderPathTemp = folderPath.replaceAll('\\', "\\\\");
+        let folderPathTemp: string = folderPath.replaceAll('\\', "\\\\");
         await taskFunction(folderPathTemp, branchNumber);
         updateProgress(++temp, total);
       } catch (error) {
@@ -108,23 +103,35 @@ export default function GitUtil() {
         break; // Stop processing further if one fails
       }
     }
-    setOutput(output + `\r\n[${taskName}]: ` + folderPaths.map(p => p.substring(p.lastIndexOf('\\') + 1)).join(','));
+    setOutput(prevOutput => `${prevOutput}\r\n[${taskName}]: ` + folderPaths.map(p => p.substring(p.lastIndexOf('\\') + 1)).join(','));
   }
 
-  async function rebaseToMaster(folderPathTemp) {
+  async function rebaseToMaster(folderPathTemp: string) {
     await invoke('execute_rebase_to_master_script', {filePath: folderPathTemp});
   }
 
-  async function commitAndPush(folderPathTemp, branchNumber) {
-    await invoke('execute_commit_and_push_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
+  async function commitAndPush(folderPathTemp: string, branchNumber: string) {
+    await invoke('execute_commit_and_push_script', {
+      filePath: folderPathTemp,
+      branch: '#' + branchNumber,
+      commitMessage: commitMessage
+    });
   }
 
-  async function commitBranch(folderPathTemp, branchNumber) {
-    await invoke('execute_commit_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
+  async function commitBranch(folderPathTemp: string, branchNumber: string) {
+    await invoke('execute_commit_script', {
+      filePath: folderPathTemp,
+      branch: '#' + branchNumber,
+      commitMessage: commitMessage
+    });
   }
 
-  async function deleteRemoteBranch(folderPathTemp, branchNumber) {
-    await invoke('execute_delete_remote_script', {filePath: folderPathTemp, branch: '#' + branchNumber, commitMessage: commitMessage});
+  async function deleteRemoteBranch(folderPathTemp: string, branchNumber: string) {
+    await invoke('execute_delete_remote_script', {
+      filePath: folderPathTemp,
+      branch: '#' + branchNumber,
+      commitMessage: commitMessage
+    });
   }
 
   async function handleRebaseToMaster() {
@@ -145,8 +152,8 @@ export default function GitUtil() {
 
   return (
     <>
-      <Snackbar open={alertOpen} autoHideDuration={6000} onClose={handleClose}>
-        <Alert onClose={handleClose} severity="error" sx={{width: '100%'}}>
+      <Snackbar open={alertOpen} autoHideDuration={6000}>
+        <Alert severity="error" sx={{width: '100%'}}>
           {alertMessage}
         </Alert>
       </Snackbar>
@@ -195,7 +202,7 @@ export default function GitUtil() {
                     <Tooltip
                       title={
                         <React.Fragment>
-                          复制阿里云任务<br />
+                          复制阿里云任务<br/>
                           例如: https://devops.aliyun.com/projex/req/SPXT-16096#《亚马逊批量调价-统一设置：增加按固定值增加/减少》
                         </React.Fragment>
                       }
@@ -251,7 +258,7 @@ export default function GitUtil() {
             color="error"
             onClick={handleRebaseToMaster}
             startIcon={<ReplayIcon/>}
-            style={{ textTransform: 'none', fontSize: '0.875rem', padding: '6px 12px', width: 'auto' }}
+            style={{textTransform: 'none', fontSize: '0.875rem', padding: '6px 12px', width: 'auto'}}
           >
             重置到master
           </Button>
